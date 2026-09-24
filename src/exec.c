@@ -15,11 +15,19 @@ int run_command(char **argv) {
 	// this is for enabling < and > to be used at the same time
 	char *in_file = NULL;
 	char *out_file = NULL;
+	char *err_file = NULL;
 	int out_append = 0; // for >>
 
 	// scan for redirect
 	for (int i = 0; argv[i] != NULL; i++) {
-		if (strcmp(argv[i], ">>") == 0) {
+		if (strcmp(argv[i], "2>") == 0) {
+			if (argv[i + 1] == NULL) {
+				perror("found redirect with no filename");
+				return -1;
+			}
+			err_file = argv[i + 1];
+			argv[i] = NULL;
+		} else if (strcmp(argv[i], ">>") == 0) {
 			if (argv[i + 1] == NULL) {  // error
 				perror("found append with no filename");
 				return -1;
@@ -55,7 +63,17 @@ int run_command(char **argv) {
 	}
 
 	if (pid == 0) {
-		if (in_file != NULL) {
+		if (err_file != NULL) { // 2>
+			int fd = open(err_file, out_open_flags, 0644);
+			if (fd == -1) {
+				perror("open");
+				_exit(1);
+			} else {
+				dup2(fd, STDERR_FILENO);
+				close(fd);
+			}
+		}
+		if (in_file != NULL) { // <
 			int fd = open(in_file, in_open_flags, 0644);
 			if (fd == -1) {
 				perror("open");
@@ -65,7 +83,7 @@ int run_command(char **argv) {
 				close(fd);
 			}
 		}
-		if (out_file != NULL) {
+		if (out_file != NULL) { // >> and >
 			int fd = open(out_file, out_append ? out_append_flags : out_open_flags, 0644);
 			if (fd == -1) {
 				perror("open");
